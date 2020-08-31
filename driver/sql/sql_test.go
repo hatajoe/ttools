@@ -14,7 +14,7 @@ func Test_Open(t *testing.T) {
 
 	ctx := context.Background()
 
-	db, err := Open(&sqlite3.SQLiteDriver{}, ":memory:", t)
+	db, err := Open(&sqlite3.SQLiteDriver{}, ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}

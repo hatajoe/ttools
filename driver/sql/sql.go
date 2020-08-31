@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	d "database/sql/driver"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
-	"testing"
 	"time"
 
 	proxy "github.com/shogo82148/go-sql-proxy"
@@ -25,7 +25,7 @@ var (
 // Open returns *sql.DB which contained following hooks
 // SQL Tracing: show executed queries and processing time by query. no display is default.
 // Auto Deletion: delete all inserted records after close the connection.
-func Open(driver d.Driver, dataSource string, t *testing.T) (*sql.DB, error) {
+func Open(driver d.Driver, dataSource string) (*sql.DB, error) {
 	alreadyRegistered := false
 	drivers := sql.Drivers()
 	for _, dn := range drivers {
@@ -34,20 +34,20 @@ func Open(driver d.Driver, dataSource string, t *testing.T) (*sql.DB, error) {
 		}
 	}
 	if !alreadyRegistered {
-		sql.Register(driverName, SetHooks(driver, t))
+		sql.Register(driverName, SetHooks(driver))
 	}
 	return sql.Open(driverName, dataSource)
 }
 
 // SetHooks set hooks to driver 
-func SetHooks(driver d.Driver, t *testing.T) d.Driver {
+func SetHooks(driver d.Driver) d.Driver {
 	return proxy.NewProxyContext(driver, &proxy.HooksContext{
 		PreExec: func(_ context.Context, _ *proxy.Stmt, _ []d.NamedValue) (interface{}, error) {
 			return time.Now(), nil
 		},
 		PostExec: func(_ context.Context, ctx interface{}, stmt *proxy.Stmt, args []d.NamedValue, res d.Result, _ error) error {
 			if sqlTracingEnabled {
-				t.Logf("Query: %s; args = %#v (%s conn:%p)\n", stmt.QueryString, args, time.Since(ctx.(time.Time)), stmt.Conn)
+				log.Printf("Query: %s; args = %#v (%s conn:%p)\n", stmt.QueryString, args, time.Since(ctx.(time.Time)), stmt.Conn)
 			}
 
 			uq := strings.ToUpper(stmt.QueryString)
