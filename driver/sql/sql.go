@@ -16,7 +16,6 @@ import (
 )
 
 var (
-	db                *sql.DB
 	sqlTracingEnabled bool
 	openCount         int64
 	driverName        string             = "tsql"
@@ -32,11 +31,6 @@ var (
 // SQL Tracing: show executed queries and processing time by query. no display is default.
 // Auto Deletion: delete all inserted records after close the connection.
 func Open(driver d.Driver, dataSource string) (*sql.DB, error) {
-	atomic.AddInt64(&openCount, 1)
-	if db != nil {
-		return db, nil
-	}
-
 	alreadyRegistered := false
 	drivers := sql.Drivers()
 	for _, dn := range drivers {
@@ -47,6 +41,9 @@ func Open(driver d.Driver, dataSource string) (*sql.DB, error) {
 	if !alreadyRegistered {
 		sql.Register(driverName, SetHooks(driver))
 	}
+
+	atomic.AddInt64(&openCount, 1)
+
 	return sql.Open(driverName, dataSource)
 }
 
