@@ -25,7 +25,8 @@ func Test_Open(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		if _, err := db.ExecContext(ctx, `INSERT INTO t1(id) VALUES(?)`, gen.ID()); err != nil {
+		if _, err := db.ExecContext(ctx, `INSERT INTO t1(id) 
+		VALUES(?)`, gen.ID()); err != nil {
 			t.Fatal(err)
 		}
 	}

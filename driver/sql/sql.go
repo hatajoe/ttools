@@ -16,8 +16,9 @@ import (
 var (
 	driverName        string = "tsql"
 	sqlTracingEnabled bool
+	regexpNewLine     *regexp.Regexp                     = regexp.MustCompile(`\n`)
 	regexpInsert      *regexp.Regexp                     = regexp.MustCompile(`INSERT`)
-	regexpTable       *regexp.Regexp                     = regexp.MustCompile(`^INSERT INTO(.*)\(.*VALUES.*$`)
+	regexpTable       *regexp.Regexp                     = regexp.MustCompile(`INSERT INTO(.*)\(.*VALUES`)
 	inserted          map[*proxy.Conn]map[string][]int64 = map[*proxy.Conn]map[string][]int64{}
 	deletionQuery     string                             = `DELETE FROM %s WHERE id = ?`
 )
@@ -39,7 +40,7 @@ func Open(driver d.Driver, dataSource string) (*sql.DB, error) {
 	return sql.Open(driverName, dataSource)
 }
 
-// SetHooks set hooks to driver 
+// SetHooks set hooks to driver
 func SetHooks(driver d.Driver) d.Driver {
 	return proxy.NewProxyContext(driver, &proxy.HooksContext{
 		PreExec: func(_ context.Context, _ *proxy.Stmt, _ []d.NamedValue) (interface{}, error) {
@@ -50,13 +51,14 @@ func SetHooks(driver d.Driver) d.Driver {
 				log.Printf("Query: %s; args = %#v (%s conn:%p)\n", stmt.QueryString, args, time.Since(ctx.(time.Time)), stmt.Conn)
 			}
 
-			uq := strings.ToUpper(stmt.QueryString)
+			q := regexpNewLine.ReplaceAllString(stmt.QueryString, "")
+			uq := strings.ToUpper(q)
 			if regexpInsert.MatchString(uq) {
 				cap := regexpTable.FindStringSubmatch(uq)
 				if len(cap) < 2 {
 					return fmt.Errorf("failed to parse table name from query: %s", stmt.QueryString)
 				}
-				table := strings.TrimSpace(cap[1])
+				table := strings.ToLower(strings.TrimSpace(cap[1]))
 				if _, ok := inserted[stmt.Conn]; !ok {
 					inserted[stmt.Conn] = map[string][]int64{}
 				}
