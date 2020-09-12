@@ -18,7 +18,6 @@ import (
 var (
 	sqlTracingEnabled bool
 	openCount         int64
-	driverName        string             = "tsql"
 	mu                *sync.Mutex        = &sync.Mutex{}
 	regexpNewLine     *regexp.Regexp     = regexp.MustCompile(`\n`)
 	regexpInsert      *regexp.Regexp     = regexp.MustCompile(`INSERT`)
@@ -27,28 +26,25 @@ var (
 	deletionQuery     string             = `DELETE FROM %s WHERE id = ?`
 )
 
-// Open returns *sql.DB which contained following hooks
+// Register driver which will be set followin hooks
 // SQL Tracing: show executed queries and processing time by query. no display is default.
-// Auto Deletion: delete all inserted records after close the connection.
-func Open(driver d.Driver, dataSource string) (*sql.DB, error) {
-	alreadyRegistered := false
-	drivers := sql.Drivers()
-	for _, dn := range drivers {
-		if driverName == dn {
-			alreadyRegistered = true
-		}
-	}
-	if !alreadyRegistered {
-		sql.Register(driverName, SetHooks(driver))
-	}
+// Auto Deletion: delete all inserted records after close the last opend connection.
+func Register(driverName string, driver d.Driver) {
+	sql.Register(driverName, setHooks(driver))
+}
 
+// Open connection by registered driver
+func Open(driverName string, dataSource string) (*sql.DB, error) {
 	atomic.AddInt64(&openCount, 1)
-
 	return sql.Open(driverName, dataSource)
 }
 
-// SetHooks set hooks to driver
-func SetHooks(driver d.Driver) d.Driver {
+// Tracing set flag which determines to show executed SQL in the console
+func Tracing(enabled bool) {
+	sqlTracingEnabled = enabled
+}
+
+func setHooks(driver d.Driver) d.Driver {
 	return proxy.NewProxyContext(driver, &proxy.HooksContext{
 		PreExec: func(_ context.Context, _ *proxy.Stmt, _ []d.NamedValue) (interface{}, error) {
 			return time.Now(), nil
@@ -90,7 +86,7 @@ func SetHooks(driver d.Driver) d.Driver {
 				return nil, nil
 			}
 			if _, err := conn.ExecContext(c, `SET foreign_key_checks = 0`, nil); err != nil {
-				return nil, err
+				log.Printf("`SET foreign_key_checks` is not supported, but continue to preClose hooks. err: %v\n", err)
 			}
 			for table, ids := range inserted {
 				if len(ids) <= 0 {
@@ -109,14 +105,10 @@ func SetHooks(driver d.Driver) d.Driver {
 					}
 				}
 				if _, err := conn.ExecContext(c, fmt.Sprintf("ALTER TABLE %s auto_increment = 1", table), nil); err != nil {
-					return nil, err
+					log.Printf("`ALTER TABLE %s auto_increment = 1` is not supported, but continue to preClose hooks. err: %v\n", table, err)
 				}
 			}
 			return nil, nil
 		},
 	})
-}
-
-func SQLTracing(enabled bool) {
-	sqlTracingEnabled = enabled
 }
