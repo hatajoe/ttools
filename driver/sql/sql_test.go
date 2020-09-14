@@ -1,4 +1,4 @@
-package sql
+package sql_test
 
 import (
 	"context"
@@ -10,8 +10,9 @@ import (
 	"sync"
 	"testing"
 
+	tsql "github.com/hatajoe/ttools/driver/sql"
+	_ "github.com/hatajoe/ttools/driver/sql/sqlite3"
 	"github.com/hatajoe/ttools/gen"
-	"github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -29,10 +30,9 @@ func Test(t *testing.T) {
 		t.Logf("%v. continue to test without removing %s", err, testDBFilePath)
 	}
 
-	Tracing(true)
-	Register("tsqlite3", &sqlite3.SQLiteDriver{})
+	tsql.Tracing(true)
 
-	db, err := Open("tsqlite3", testDBFilePath)
+	db, err := sql.Open("ttools-sqlite3", testDBFilePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func Test(t *testing.T) {
 					defer wg.Done()
 
 					ctx := context.Background()
-					db, err := Open("tsqlite3", testDBFilePath)
+					db, err := sql.Open("ttools-sqlite3", testDBFilePath)
 					if err != nil {
 						errCh <- err
 						return
@@ -103,7 +103,7 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	db, err = Open("tsqlite3", testDBFilePath)
+	db, err = sql.Open("ttools-sqlite3", testDBFilePath)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,7 +2,6 @@ package sql
 
 import (
 	"context"
-	"database/sql"
 	d "database/sql/driver"
 	"fmt"
 	"log"
@@ -26,26 +25,22 @@ var (
 	deletionQuery     string             = `DELETE FROM %s WHERE id = ?`
 )
 
-// Register driver which will be set followin hooks
-// SQL Tracing: show executed queries and processing time by query. no display is default.
-// Auto Deletion: delete all inserted records after close the last opend connection.
-func Register(driverName string, driver d.Driver) {
-	sql.Register(driverName, setHooks(driver))
-}
-
-// Open connection by registered driver
-func Open(driverName string, dataSource string) (*sql.DB, error) {
-	atomic.AddInt64(&openCount, 1)
-	return sql.Open(driverName, dataSource)
-}
-
 // Tracing set flag which determines to show executed SQL in the console
 func Tracing(enabled bool) {
 	sqlTracingEnabled = enabled
 }
 
-func setHooks(driver d.Driver) d.Driver {
+// SetHooks sets following context hooks
+// PreOpen: count opening connection in order to delete inserted records when last opend connection is closed.
+// PreExec: start count for to record SQL execution time
+// PostExec: show executed Query and execution time if sqlTracingEnabled is set true
+// PreClose: delete all inserted records when last opened connection is closed.
+func SetHooks(driver d.Driver) d.Driver {
 	return proxy.NewProxyContext(driver, &proxy.HooksContext{
+		PreOpen: func(c context.Context, name string) (interface{}, error) {
+			atomic.AddInt64(&openCount, 1)
+			return nil, nil
+		},
 		PreExec: func(_ context.Context, _ *proxy.Stmt, _ []d.NamedValue) (interface{}, error) {
 			return time.Now(), nil
 		},
