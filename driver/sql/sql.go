@@ -73,6 +73,15 @@ func SetHooks(driver d.Driver) d.Driver {
 			}
 			return nil
 		},
+		PreQuery: func(c context.Context, stmt *proxy.Stmt, args []d.NamedValue) (interface{}, error) {
+			return time.Now(), nil
+		},
+		PostQuery: func(c context.Context, ctx interface{}, stmt *proxy.Stmt, args []d.NamedValue, rows d.Rows, err error) error {
+			if sqlTracingEnabled {
+				log.Printf("Query: %s; args = %#v (%s conn:%p)\n", stmt.QueryString, args, time.Since(ctx.(time.Time)), stmt.Conn)
+			}
+			return nil
+		},
 		PreClose: func(c context.Context, conn *proxy.Conn) (interface{}, error) {
 			mu.Lock()
 			defer mu.Unlock()
