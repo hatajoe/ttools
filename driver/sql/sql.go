@@ -17,12 +17,12 @@ import (
 var (
 	sqlTracingEnabled bool
 	openCount         int64
-	mu                *sync.Mutex        = &sync.Mutex{}
-	regexpNewLine     *regexp.Regexp     = regexp.MustCompile(`\n`)
-	regexpInsert      *regexp.Regexp     = regexp.MustCompile(`INSERT`)
-	regexpTable       *regexp.Regexp     = regexp.MustCompile(`INSERT INTO(.*)\(.*VALUES`)
-	inserted          map[string][]int64 = map[string][]int64{}
-	deletionQuery     string             = `DELETE FROM %s WHERE id = ?`
+	mu                *sync.Mutex                   = &sync.Mutex{}
+	regexpNewLine     *regexp.Regexp                = regexp.MustCompile(`\n`)
+	regexpInsert      *regexp.Regexp                = regexp.MustCompile(`INSERT`)
+	regexpTable       *regexp.Regexp                = regexp.MustCompile(`INSERT INTO(.*)\(.*VALUES`)
+	inserted          map[string]map[string][]int64 = map[string]map[string][]int64{}
+	deletionQuery     string                        = `DELETE FROM %s WHERE id = ?`
 )
 
 // Tracing set flag which determines to show executed SQL in the console
@@ -44,7 +44,7 @@ func SetHooks(driver d.Driver) d.Driver {
 		PreExec: func(_ context.Context, _ *proxy.Stmt, _ []d.NamedValue) (interface{}, error) {
 			return time.Now(), nil
 		},
-		PostExec: func(_ context.Context, ctx interface{}, stmt *proxy.Stmt, args []d.NamedValue, res d.Result, _ error) error {
+		PostExec: func(c context.Context, ctx interface{}, stmt *proxy.Stmt, args []d.NamedValue, res d.Result, _ error) error {
 			if sqlTracingEnabled {
 				log.Printf("Query: %s; args = %#v (%s conn:%p)\n", stmt.QueryString, args, time.Since(ctx.(time.Time)), stmt.Conn)
 			}
@@ -60,15 +60,19 @@ func SetHooks(driver d.Driver) d.Driver {
 					return fmt.Errorf("failed to parse table name from query: %s", stmt.QueryString)
 				}
 				table := strings.ToLower(strings.TrimSpace(cap[1]))
-				if _, ok := inserted[table]; !ok {
-					inserted[table] = []int64{}
+				ctxPtr := fmt.Sprintf("%p", c)
+				if _, ok := inserted[ctxPtr]; !ok {
+					inserted[ctxPtr] = map[string][]int64{}
+				}
+				if _, ok := inserted[ctxPtr][table]; !ok {
+					inserted[ctxPtr][table] = []int64{}
 				}
 				if res != nil {
 					lastInsertId, err := res.LastInsertId()
 					if err != nil {
 						return err
 					}
-					inserted[table] = append(inserted[table], lastInsertId)
+					inserted[ctxPtr][table] = append(inserted[ctxPtr][table], lastInsertId)
 				}
 			}
 			return nil
@@ -92,7 +96,8 @@ func SetHooks(driver d.Driver) d.Driver {
 			if _, err := conn.ExecContext(c, `SET foreign_key_checks = 0`, nil); err != nil {
 				log.Printf("`SET foreign_key_checks` is not supported, but continue to preClose hooks. err: %v\n", err)
 			}
-			for table, ids := range inserted {
+			ctxPtr := fmt.Sprintf("%p", c)
+			for table, ids := range inserted[ctxPtr] {
 				if len(ids) <= 0 {
 					continue
 				}
@@ -112,6 +117,7 @@ func SetHooks(driver d.Driver) d.Driver {
 					log.Printf("`ALTER TABLE %s auto_increment = 1` is not supported, but continue to preClose hooks. err: %v\n", table, err)
 				}
 			}
+			inserted[ctxPtr] = make(map[string][]int64)
 			return nil, nil
 		},
 	})

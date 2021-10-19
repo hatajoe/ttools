@@ -30,7 +30,7 @@ func Test(t *testing.T) {
 		t.Logf("%v. continue to test without removing %s", err, testDBFilePath)
 	}
 
-	tsql.Tracing(true)
+	tsql.Tracing(false)
 
 	db, err := sql.Open("ttools-sqlite3", testDBFilePath)
 	if err != nil {

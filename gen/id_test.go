@@ -11,7 +11,7 @@ func Test_ID(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	for i := 0; i < expected-1; i++ {
 		wg.Add(1)
-		go func () {
+		go func() {
 			ID()
 			wg.Done()
 		}()
