@@ -86,6 +86,33 @@ func SetHooks(driver d.Driver) d.Driver {
 			}
 			return nil
 		},
+		PreBegin: func(c context.Context, conn *proxy.Conn) (interface{}, error) {
+			return time.Now(), nil
+		},
+		PostBegin: func(c context.Context, ctx interface{}, conn *proxy.Conn, err error) error {
+			if sqlTracingEnabled {
+				log.Printf("Query: BEGIN; (%s conn:%p)\n", time.Since(ctx.(time.Time)), conn)
+			}
+			return nil
+		},
+		PreCommit: func(c context.Context, tx *proxy.Tx) (interface{}, error) {
+			return time.Now(), nil
+		},
+		PostCommit: func(c context.Context, ctx interface{}, tx *proxy.Tx, err error) error {
+			if sqlTracingEnabled {
+				log.Printf("Query: COMMIT; (%s conn:%p)\n", time.Since(ctx.(time.Time)), tx.Conn)
+			}
+			return nil
+		},
+		PreRollback: func(c context.Context, tx *proxy.Tx) (interface{}, error) {
+			return time.Now(), nil
+		},
+		PostRollback: func(c context.Context, ctx interface{}, tx *proxy.Tx, err error) error {
+			if sqlTracingEnabled {
+				log.Printf("Query: ROLLBACK; (%s conn:%p)\n", time.Since(ctx.(time.Time)), tx.Conn)
+			}
+			return nil
+		},
 		PreClose: func(c context.Context, conn *proxy.Conn) (interface{}, error) {
 			mu.Lock()
 			defer mu.Unlock()
