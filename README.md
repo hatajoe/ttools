@@ -1,15 +1,15 @@
 # ttools
 
-ttools is utility packages for writing tests.  
-ttools currently has following functionality.  
+ttools is utility packages for writing tests.
+ttools currently has following functionality.
 
 - incremental unique number ID generator (goroutine safe)
 - SQL and processing time tracing for database/sql
-- auto DB records cleaner for database/sql
+- auto DB setup and cleanup
 
 # Usage
 
-## unique number ID generator 
+## unique number ID generator
 
 generate unique number ID which can be called by multiple goroutine in safe.
 
@@ -44,9 +44,7 @@ func Test(t *testing.T) {
 
 ## tracing and auto DB records cleaner
 
-delete all inserted records which registed by driver after db.Close called.  
-This deletion records hook is emit only once per driver. (not per opend connection)  
-This hook ignores `foreign_key_checks`, and resets `auto_increment`.  
+Create database before sql.Open called, and drop after db.Close called.
 
 ```go
 package some_test
@@ -62,14 +60,18 @@ import (
 func Test(t *testing.T) {
 	// if pass the true for sql.Tracing, show executed SQL and processing time to the console
 	tsql.Tracing(true)
+	// set database name used in while testing
+	// this is created after sql.Open, and is droped before db.Close (default database name is `ttools`)
+	tsql.TestDatabase("test")
 
-	// Open `ttools-mysql` driver which includes hooks functionality
+	// Open `ttools-mysql` driver
+	// dbname will be ignored, ttools uses the database specified at tsql.DatabaseName
 	db, err := sql.Open("ttools-mysql", "user:password@protocol(host:port)/dbname")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		// delete all inserted records by regstered driver
+		// drop database before closing the connection
 		if err := db.Close(); err != nil {
 			t.Fatal()
 		}

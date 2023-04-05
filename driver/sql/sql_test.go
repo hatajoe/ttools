@@ -30,7 +30,8 @@ func Test(t *testing.T) {
 		t.Logf("%v. continue to test without removing %s", err, testDBFilePath)
 	}
 
-	tsql.Tracing(false)
+	tsql.Tracing(true)
+	tsql.TestDatabase(`tootls-test`)
 
 	db, err := sql.Open("ttools-sqlite3", testDBFilePath)
 	if err != nil {
@@ -101,25 +102,6 @@ func Test(t *testing.T) {
 	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
-	}
-
-	db, err = sql.Open("ttools-sqlite3", testDBFilePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	cnt, err := count(db, `SELECT COUNT(*) FROM t1`)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if cnt != 0 {
-		t.Errorf("table records count is expected to be 0, but %d count detected", cnt)
 	}
 
 	if err := removeDB(); err != nil {
